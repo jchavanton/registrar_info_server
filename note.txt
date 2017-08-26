@@ -1,0 +1,25 @@
+Tu dois écrire un programme en C, C++ ou Java qui correspond à la
+description suivante. Tu peux utiliser des librairies. Tu peux nous
+poser des questions.
+
+En pièce jointe se trouve un fichier contenant un “dump” de registrations SIP. Le programme
+doit lire le fichier et le charger en mémoire. 
+
+Le programme doit écouter pour des requêtes entrantes sur un socket TCP.
+
+Sur ce socket, l’application peut recevoir des requêtes de lookup contenant un AOR(Address of Record) par ligne. L’application doit répondre avec l’objet JSON correspondant.
+
+Quand un client se connecte, il peut faire des requêtes de lookup. 
+
+Par exemple, si un client envoie:
+
+> 0142e2fa3543cb32bf000100620002
+
+Le serveur va retourner:
+
+> {"addressOfRecord":"0142e2fa3543cb32bf000100620002","tenantId":"0127d974-f9f3-0704-2dee-000100420001","uri":"sip:0142e2fa3543cb32bf000100620002@10.21.21.127;jbcuser=cpe70;x-ebcid=AsfApcJMpgA","contact":"<sip:0142e2fa3543cb32bf000100620002@10.21.21.127;jbcuser=cpe70;x-ebcid=AsfApcJMpgA>;methods=\"INVITE, ACK, BYE, CANCEL, OPTIONS, INFO, MESSAGE, SUBSCRIBE, NOTIFY, PRACK, UPDATE, REFER\"","path":["<sip:Mi0xOTkuMTkyLjE2NS4xOTQtMTk2MjI@10.119.255.103:5060;lr>"],"source":"199.192.165.194:19622","target":"162.250.60.10:5061","userAgent":"polycom.vvx.600","rawUserAgent":"PolycomVVX-VVX_600-UA/5.4.5.6770","created":"2016-12-12T22:40:40.764Z","lineId":"013db2ba-2175-6d29-6157-000100620002"}
+
+Le client peut envoyer autant de requêtes qu'il veut, une à la suite de l'autre. Si une connexion TCP est inactive pendant plus de 10 secondes, le serveur la ferme. Si un AOR est introuvable, le serveur retourne une ligne vide.
+
+Bien que cet exercice est simple, imagine que l’application développée deviendra la base  d’un nouveau produit. Prends les mesures nécessaire afin d’assurer la flexibilité, l’extensibilité et la maintenabilité de l’application compte tenu du temps qui t’es alloué.
+
