@@ -1,20 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "../include/uthash.h"
+
 #include "../include/jsmn.h"
+#include "../include/storage.h"
+#include "../include/tcp_server.h"
 
-/* string */
-typedef struct str {
-	int len;
-	char *s;
-} str_t;
 
-/* storage unit */
-typedef struct record {
-	str_t data;        // JSON data
-	char *aor;         // address of record
-	UT_hash_handle hh; // htable field
-} record_t;
 
 /* storage root */
 int record_count;
@@ -113,5 +104,9 @@ void main(void) {
 		printf("\naor[%s] found:%s\n", aor, record->data.s);
 	} else {
 		printf("aor[%s] not found!\n", aor);
+	}
+	int ret = serve();
+	if (ret != 0) {
+		printf("[error] tcp server error: %d", ret);
 	}
 }
