@@ -1,11 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
-
 #include "../include/jsmn.h"
 #include "../include/storage.h"
 #include "../include/tcp_server.h"
-
-
 
 /* storage root */
 int record_count;
@@ -23,7 +20,6 @@ record_t* find_record(char *aor) {
 	record_t *record;
 	HASH_FIND_STR(records, aor, record);
 	return record;
-
 }
 
 /* find a json value by matching the key */
@@ -36,15 +32,16 @@ static int jsoneq(const char *json, jsmntok_t *tok, const char *s) {
 }
 
 /* process on input data line, data file must be formated to have one json record per line */
-int parse_line(char *line, int len) {
+int process_line(char *line, int len) {
 	if (!len)
 		return 0;
-	//printf("parsing[%d] %s", len, line);
+	++len;
 	record_t *record = (record_t*) malloc(sizeof(record_t));
 	record->data.len = len;
 	record->data.s = (char*) malloc(sizeof(char)*len);
 	memcpy(record->data.s, line, len);
 	record->data.s[len-1] = '\0';
+	record->data.s[len-2] = '\n';
 
 	int i;
 	int r;
@@ -84,7 +81,7 @@ int load_data_from_file(const char *fn) {
 		return 0;
 	}
 	while ((read = getline(&line, &len, fp)) != -1) {
-		if(!parse_line(line, read))
+		if (!process_line(line, read))
 			return 0;
 	}
 	fclose(fp);
@@ -93,18 +90,10 @@ int load_data_from_file(const char *fn) {
 	return 1;
 }
 
-
-
 void main(void) {
 	if (!load_data_from_file("data/registrations.json"))
 		return;
 	char *aor = "0155839131f84c669c000100620009";
-	record_t *record = find_record(aor);
-	if (record) {
-		printf("\naor[%s] found:%s\n", aor, record->data.s);
-	} else {
-		printf("aor[%s] not found!\n", aor);
-	}
 	int ret = serve();
 	if (ret != 0) {
 		printf("[error] tcp server error: %d", ret);

@@ -42,7 +42,7 @@ typedef struct socket_pool {
 	int size;
 } socket_pool_t;
 
-int socket_pool_init(socket_pool_t * sp) {
+static int socket_pool_init(socket_pool_t * sp) {
 	FD_ZERO(&sp->master);    // clear the master and temp sets
 	sp->size = 100;
 	sp->sockets = (socket_t *) malloc(sizeof(socket_t)*sp->size);
@@ -51,7 +51,8 @@ int socket_pool_init(socket_pool_t * sp) {
 		return 0;
 	return 1;
 }
-int socket_pool_expand(socket_pool_t * sp) {
+
+static int socket_pool_expand(socket_pool_t * sp) {
 	int expand_size = 50;
 	printf("[socket_pool_expand]+%d\n",expand_size);
 	sp->size += expand_size;
@@ -61,7 +62,8 @@ int socket_pool_expand(socket_pool_t * sp) {
 	memset(sp->sockets-expand_size, 0, sizeof(socket_t)*expand_size);
 	return 1;
 }
-int socket_pool_add(socket_pool_t * sp, int s) {
+
+static int socket_pool_add(socket_pool_t * sp, int s) {
 	set_socket_options(s);
 	FD_SET(s, &sp->master);
 	if (s > sp->size)
@@ -70,7 +72,8 @@ int socket_pool_add(socket_pool_t * sp, int s) {
 	sp->count++;
 	return 1;
 }
-int socket_pool_rm(socket_pool_t * sp, int s) {
+
+static int socket_pool_rm(socket_pool_t * sp, int s) {
 	close(s);
 	FD_CLR(s, &sp->master);
 	sp->sockets[s].last_activity = 0;
@@ -103,7 +106,7 @@ int serve(void) {
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
 	if ((rv = getaddrinfo(NULL, PORT, &hints, &ai)) != 0) {
-		fprintf(stderr, "selectserver: %s\n", gai_strerror(rv));
+		fprintf(stderr, "tcp_server: %s\n", gai_strerror(rv));
 		return 1;
 	}
 
@@ -123,7 +126,7 @@ int serve(void) {
 
 	// if we got here, it means we didn't get bound
 	if (p == NULL) {
-		fprintf(stderr, "selectserver: failed to bind\n");
+		fprintf(stderr, "tcp_server: failed to bind\n");
 		return 2;
 	}
 	freeaddrinfo(ai); // all done with this
@@ -132,6 +135,7 @@ int serve(void) {
 		perror("listen");
 		return 3;
 	}
+	printf("\nregistrar information server: listening 0.0.0.0:%s \n", PORT);
 
 	// add the listener to the master set
 	FD_SET(listener, &socket_pool.master);
@@ -173,7 +177,7 @@ int serve(void) {
 						} else {
 							if (newfd > fdmax)   // keep track of the max
 								fdmax = newfd;
-							printf("selectserver: new connection from %s on "
+							printf("tcp_server: new connection from %s on "
 								"socket %d\n",
 								inet_ntop(remoteaddr.ss_family,
 								get_in_addr((struct sockaddr*)&remoteaddr),
@@ -187,12 +191,12 @@ int serve(void) {
 						// got error or connection closed by client
 						if (nbytes == 0) {
 							// connection closed
-							printf("selectserver: socket %d hung up\n", i);
+							printf("tcp_server: socket %d hung up\n", i);
 						} else {
 							perror("recv");
 						}
 						socket_pool_rm(&socket_pool, i);
-					} else {
+					} else if (nbytes >= 2) {
 						buf[nbytes-2]='\0';
 						char *aor = strdup(buf);
 						record_t *record = find_record(aor);
@@ -202,6 +206,9 @@ int serve(void) {
 								perror("send");
 						} else {
 							printf("aor[%s] not found!\n", aor);
+							char *none = "\n\e";
+							if (send(i, none, 1, 0) == -1)
+								perror("send");
 						}
 					}
 				} // END handle data from client
