@@ -1,3 +1,5 @@
+#ifndef STORAGE_FILE_H
+#define STORAGE_FILE_H
 
 #include "../include/uthash.h"
 
@@ -15,3 +17,5 @@ typedef struct record {
 } record_t;
 
 record_t* find_record(char *aor);
+
+#endif
