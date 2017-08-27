@@ -36,12 +36,14 @@ typedef struct socket {
 } socket_t;
 
 typedef struct socket_pool {
+	fd_set master;    // master file descriptor list
 	socket_t *sockets;
 	int count;
 	int size;
 } socket_pool_t;
 
 int socket_pool_init(socket_pool_t * sp) {
+	FD_ZERO(&sp->master);    // clear the master and temp sets
 	sp->size = 100;
 	sp->sockets = (socket_t *) malloc(sizeof(socket_t)*sp->size);
 	memset(sp->sockets, 0, sizeof(socket_t)*sp->size);
@@ -60,6 +62,8 @@ int socket_pool_expand(socket_pool_t * sp) {
 	return 1;
 }
 int socket_pool_add(socket_pool_t * sp, int s) {
+	set_socket_options(s);
+	FD_SET(s, &sp->master);
 	if (s > sp->size)
 		socket_pool_expand(sp);
 	sp->sockets[s].last_activity = time(NULL);
@@ -67,13 +71,14 @@ int socket_pool_add(socket_pool_t * sp, int s) {
 	return 1;
 }
 int socket_pool_rm(socket_pool_t * sp, int s) {
+	close(s);
+	FD_CLR(s, &sp->master);
 	sp->sockets[s].last_activity = 0;
 	sp->count--;
 	return 1;
 }
 
 int serve(void) {
-	fd_set master;    // master file descriptor list
 	fd_set read_fds;  // temp file descriptor list for select()
 	int fdmax;        // maximum file descriptor number
 	int listener;     // listening socket descriptor
@@ -87,12 +92,10 @@ int serve(void) {
 	int i, j, rv;
 	struct addrinfo hints, *ai, *p;
 
-	FD_ZERO(&master);    // clear the master and temp sets
-	FD_ZERO(&read_fds);
-
 	socket_pool_t socket_pool;
 	if (!socket_pool_init(&socket_pool))
 		return 1;
+	FD_ZERO(&read_fds);
 
 	// get us a socket and bind it
 	memset(&hints, 0, sizeof hints);
@@ -131,7 +134,7 @@ int serve(void) {
 	}
 
 	// add the listener to the master set
-	FD_SET(listener, &master);
+	FD_SET(listener, &socket_pool.master);
 	// keep track of the biggest file descriptor
 	fdmax = listener; // so far, it's this one
 
@@ -142,7 +145,7 @@ int serve(void) {
 
 	// main loop
 	for(;;) {
-		read_fds = master; // copy it
+		read_fds = socket_pool.master; // copy it
 		if (select(fdmax+1, &read_fds, NULL, NULL, &interval) == -1) {
 			printf("[error] select");
 			return 4;
@@ -156,14 +159,11 @@ int serve(void) {
 				int idle_sec = now - socket_pool.sockets[i].last_activity;
 				if (idle_sec >= 10){
 					printf("disconnecting socket_fd[%d] after[%d] idle seconds...\n", i, idle_sec);
-					close(i); // bye!
-					FD_CLR(i, &master); // remove from master set
+
 					socket_pool_rm(&socket_pool, i);
 				}
 			}
 			if (FD_ISSET(i, &read_fds)) { // we got one!!
-				//printf("[%d] ...\n", i);
-
 				if (i == listener) {
 						// handle new connections
 						addrlen = sizeof remoteaddr;
@@ -171,8 +171,6 @@ int serve(void) {
 						if (newfd == -1) {
 							perror("accept");
 						} else {
-							set_socket_options(newfd);
-							FD_SET(newfd, &master); // add to master set
 							if (newfd > fdmax)   // keep track of the max
 								fdmax = newfd;
 							printf("selectserver: new connection from %s on "
@@ -193,8 +191,6 @@ int serve(void) {
 						} else {
 							perror("recv");
 						}
-						close(i); // bye!
-						FD_CLR(i, &master); // remove from master set
 						socket_pool_rm(&socket_pool, i);
 					} else {
 						buf[nbytes-2]='\0';
